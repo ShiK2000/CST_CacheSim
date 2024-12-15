@@ -17,7 +17,7 @@ using std::string;
 using std::stringstream;
 
 //perhaps move to another file [oh but the price of editing the make file:(]
-class cache // simple cache - TODO implementation for i-ways!
+class cache // simple cache
 {
 	private:
 	std::vector<unsigned long int > elements;
@@ -203,7 +203,17 @@ int main(int argc, char **argv)
 		// ok so we actually are looking only for top (size_of_num - block_size_in_log) digits
 		// so the cache is represented by:
 		num = num / (pow (10, BSize));
-		
+		// and out of theses we want to de-ways it (the amount of different positions in the cache is limited)
+		// 0x AAAAAA BBBBB CCCCC DDDDD
+		// A: set representive 
+		// B: repreaters of same set (disregarded)
+		// C: cacheline representative
+		// D: in-block data (disregarded)
+
+		// extract AC from num which is ABC now:
+		// TODO
+
+
 		// general concept:
 		if(true /* L1 hit */)
 		{
