@@ -17,7 +17,7 @@ using std::string;
 using std::stringstream;
 
 //perhaps move to another file [oh but the price of editing the make file:(]
-class cache
+class cache // simple cache - TODO implementation for i-ways!
 {
 	private:
 	std::vector<unsigned long int > elements;
@@ -195,10 +195,6 @@ int main(int argc, char **argv)
 		// cout << "operation: " << operation;
 
 		string cutAddress = address.substr(2); // Removing the "0x" part of the address
-
-		// DEBUG - remove this line
-		// cout << ", address (hex)" << cutAddress;
-
 		unsigned long int num = 0;
 		num = strtoul(cutAddress.c_str(), NULL, 16);
 
@@ -207,10 +203,25 @@ int main(int argc, char **argv)
 		// ok so we actually are looking only for top (size_of_num - block_size_in_log) digits
 		// so the cache is represented by:
 		num = num / (pow (10, BSize));
+		
+		// general concept:
+		if(true /* L1 hit */)
+		{
+			// done i think
+		}
+		else
+		{
+			if (true /* L2 hit */)
+			{
+				// if WB1, WB to L1 and finish
+			}
+			else
+			{
+				// bring from memory
+				// if WB2, WB to L2, if WB1 also WB to L1
+			}
+		}
 
-
-		// DEBUG - remove this line
-		// cout << " (dec) " << num << endl;
 	}
 
 	double L1MissRate;
