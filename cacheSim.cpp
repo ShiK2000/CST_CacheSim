@@ -212,6 +212,7 @@ int main(int argc, char **argv)
 
 		// extract AC from num which is ABC now:
 		// TODO
+		// ABC is inserted into the cache, but when kicking someone out it is done by their AC (the set)
 
 
 		// general concept:
