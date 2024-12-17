@@ -17,7 +17,7 @@ using std::string;
 using std::stringstream;
 
 //perhaps move to another file [oh but the price of editing the make file:(]
-class cache // simple cache
+class cache // simple cache  // this is the behavior of the set 
 {
 	private:
 	std::vector<unsigned long int > elements;
@@ -28,7 +28,6 @@ class cache // simple cache
 	cache(int size)
 	{
 		// vector is doing the dirty work on its own
-		// this->elements
 		this->maxSize  = size;
 		this->currSize = 0;
 	}
@@ -46,7 +45,7 @@ class cache // simple cache
 		return false;
 	}
 
-	std::vector<unsigned long int >::iterator exists (int x)
+	std::vector<unsigned long int >::iterator exists (unsigned long int x)
 	{
 		for (auto i = this->elements.begin() ; i != this->elements.end() ; i++)
 		{
@@ -72,7 +71,7 @@ class cache // simple cache
 		int dude = *x; 
 		if( elements.back() != dude)
 		{
-			// if he is not already last
+			// if he is not already last - they didn't say to optimize but like cmon
 			this->elements.erase(x);
 			this->elements.push_back(dude);
 		}
@@ -166,7 +165,10 @@ int main(int argc, char **argv)
 	// lovely ♥
 	// now for the fun shit
 
-
+	// it's supposed to kinda be an array/vector of the cache type, with each cell corresponding to way
+	// not vibing with vector<cache> as then we'll need to monitor it's size but cache[L1Size] also feels weird
+	// i should start working on it when the sun is up
+	// 
 	cache L1(L1Size);
 	//   _______________
 	//  |     L1        |
