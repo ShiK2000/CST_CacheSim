@@ -6,6 +6,7 @@
 // fuck everything i am not recreating something that alredy exists
 
 #include <vector>
+#include <map>
 #include <math.h> // literaly just for the pow function
 
 using std::cerr;
@@ -16,8 +17,24 @@ using std::ifstream;
 using std::string;
 using std::stringstream;
 
-//perhaps move to another file [oh but the price of editing the make file:(]
-class cache // simple cache  // this is the behavior of the set 
+class Cache
+{
+
+	private: std::map<int, Way> sets;
+	int numSets;
+    int associativity;
+
+	public:
+	Cache(int size, int blockSize, int assoc) {
+        numSets = size / (blockSize * assoc);
+        associativity = assoc;
+        sets = std::vector<Way>(numSets, Way(assoc));
+    }
+
+	bool access(unsigned long address, bool isWrite) {}
+}
+
+class Way // this is the behavior of the set 
 {
 	private:
 	std::vector<unsigned long int > elements;
@@ -25,13 +42,13 @@ class cache // simple cache  // this is the behavior of the set
 	int currSize;
 
 	public:
-	cache(int size)
+	Way(int size)
 	{
 		// vector is doing the dirty work on its own
 		this->maxSize  = size;
 		this->currSize = 0;
 	}
-	~cache() = default; 
+	~Way() = default; 
 
 	bool add(unsigned long int  newComer)
 	{
