@@ -17,42 +17,25 @@ using std::ifstream;
 using std::string;
 using std::stringstream;
 
-class Cache
+class Way // this is the behavior of the set
 {
-
-	private: std::map<int, Way> sets;
-	int numSets;
-    int associativity;
-
-	public:
-	Cache(int size, int blockSize, int assoc) {
-        numSets = size / (blockSize * assoc);
-        associativity = assoc;
-        sets = std::vector<Way>(numSets, Way(assoc));
-    }
-
-	bool access(unsigned long address, bool isWrite) {}
-}
-
-class Way // this is the behavior of the set 
-{
-	private:
-	std::vector<unsigned long int > elements;
+private:
+	std::vector<unsigned long int> elements;
 	int maxSize;
 	int currSize;
 
-	public:
+public:
 	Way(int size)
 	{
 		// vector is doing the dirty work on its own
-		this->maxSize  = size;
+		this->maxSize = size;
 		this->currSize = 0;
 	}
-	~Way() = default; 
+	~Way() = default;
 
-	bool add(unsigned long int  newComer)
+	bool add(unsigned long int newComer)
 	{
-		if(currSize < maxSize)
+		if (currSize < maxSize)
 		{
 			// we good we can add a new friend
 			this->elements.push_back(newComer);
@@ -62,40 +45,39 @@ class Way // this is the behavior of the set
 		return false;
 	}
 
-	std::vector<unsigned long int >::iterator exists (unsigned long int x)
+	bool exists(unsigned long int x)
 	{
-		for (auto i = this->elements.begin() ; i != this->elements.end() ; i++)
+		for (auto i = this->elements.begin(); i != this->elements.end(); i++)
 		{
-			if(*i == x)
+			if (*i == x)
 			{
 				// hit!
-				return i;
+				return true;
 			}
 		}
 		// miss :(
-		return this->elements.end();
-		
+		return false;
 	}
 
-	bool accessed (std::vector<unsigned long int >::iterator x)
+	bool accessed(std::vector<unsigned long int>::iterator x)
 	{
-		if(x == this->elements.end())
+		if (x == this->elements.end())
 		{
 			// for the if case
 			return false;
 		}
 
-		int dude = *x; 
-		if( elements.back() != dude)
+		int value = *x;
+		if (elements.back() != value)
 		{
 			// if he is not already last - they didn't say to optimize but like cmon
 			this->elements.erase(x);
-			this->elements.push_back(dude);
+			this->elements.push_back(value);
 		}
 		return true;
 	}
 
-	unsigned long int RemoveLRU ()
+	unsigned long int RemoveLRU()
 	{
 		unsigned long int deleted = *(this->elements.begin());
 		this->elements.erase(elements.begin());
@@ -103,10 +85,45 @@ class Way // this is the behavior of the set
 	}
 };
 
+class Cache
+{
+private:
+	std::map<unsigned long int, Way> sets; // assuming all accessed addresses are valid, we do not need to limit or check the inputs into here
+	int numSets;
+	int associativity;
+	bool wr_alloc;
 
+public:
+	Cache(unsigned long int size, int blockSize, int assoc, int wr_alloc)
+	{
+		wr_alloc = wr_alloc;
+		numSets = size / (blockSize * assoc);
+		associativity = assoc;
+		sets = std::map<unsigned long int, Way>();
+	}
 
+	bool access(unsigned long int address, bool isWrite) {}
 
+	bool add(unsigned long int set, unsigned long int newComer)
+	{
+		return sets[set].add(newComer);
+	}
 
+	bool exists(unsigned long int set, unsigned long int x)
+	{
+		return sets[set].exists(x);
+	}
+
+	bool accessed(unsigned long int set, std::vector<unsigned long int>::iterator x)
+	{
+		return sets[set].accessed(x);
+	}
+
+	unsigned long int RemoveLRU(unsigned long int set)
+	{
+		return sets[set].RemoveLRU();
+	}
+};
 
 int main(int argc, char **argv)
 {
@@ -185,17 +202,23 @@ int main(int argc, char **argv)
 	// it's supposed to kinda be an array/vector of the cache type, with each cell corresponding to way
 	// not vibing with vector<cache> as then we'll need to monitor it's size but cache[L1Size] also feels weird
 	// i should start working on it when the sun is up
-	// 
-	cache L1(L1Size);
+	//
+	// cache L1(L1Size);
 	//   _______________
 	//  |     L1        |
-	//   ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾  
-	cache L2(L2Size);
+	//   ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
+	Cache L1 = Cache(L1Size, BSize, L1Assoc, WrAlloc);
+	// cache L2(L2Size);
 	//   _________________________
 	//  |           L2            |
-	//   ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾  
+	//   ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
+	Cache L2 = Cache(L2Size, BSize, L2Assoc, WrAlloc);
 
 	
+	double L1MissRate = 0 ;
+	double L2MissRate= 0;
+	double accTimeCounter = 0;
+
 	while (getline(file, line))
 	{
 
@@ -221,49 +244,72 @@ int main(int argc, char **argv)
 
 		// ok so we actually are looking only for top (size_of_num - block_size_in_log) digits
 		// so the cache is represented by:
-		num = num / (pow (10, BSize));
-		// and out of theses we want to de-ways it (the amount of different positions in the cache is limited)
-		// 0x AAAAAA BBBBB CCCCC DDDDD
-		// A: set representive 
-		// B: repreaters of same set (disregarded)
-		// C: cacheline representative
-		// D: in-block data (disregarded)
+		num = num / (pow(10, BSize));
+		int setSize1 = std::log(L1Assoc);
+		int setSize2 = std::log(L2Assoc);
 
-		// extract AC from num which is ABC now:
+		// the indexes for accessing the elements in the Ls
+		unsigned long int set1 = num % (unsigned long int)(pow(10, setSize1));
+		unsigned long int set2 = num % (unsigned long int)(pow(10, setSize2));
+
 		// TODO
-		// ABC is inserted into the cache, but when kicking someone out it is done by their AC (the set)
-
 
 		// general concept:
-		if(true /* L1 hit */)
+		accTimeCounter += L1Cyc;
+		if (L1.exists(set1, num))
 		{
 			// done i think
+			// accessed
+			// hit L1 ++ , + count time
 		}
 		else
 		{
-			if (true /* L2 hit */)
+			accTimeCounter += L2Cyc;
+			// L1 miss
+			// write allocate upon L1 miss:
+			if (operation == 'W')
+			{
+				// writing command
+				if (WrAlloc)
+				{
+					// yes allocate
+				}
+				else
+				{
+					// no allocate
+				}
+			}
+
+			// attemting L2:
+			if (L2.exists(set2, num))
 			{
 				// if WB1, WB to L1 and finish
 			}
 			else
 			{
-				// bring from memory
+				accTimeCounter += MemCyc;
+				// write allocate upon L2 miss:
+				/* 
+				
+				
+				
+				*/
+				// if L2 got a new line and a line got evicted from it - we need 
+				// to check if L1 containg this line and if so remove it from there as well
+
+				// bring from memory 
 				// if WB2, WB to L2, if WB1 also WB to L1
 			}
 		}
-
 	}
 
-	double L1MissRate;
-	double L2MissRate;
+	
 	double avgAccTime;
 
 	// finally: printing
 	printf("L1miss=%.03f ", L1MissRate);
 	printf("L2miss=%.03f ", L2MissRate);
 	printf("AccTimeAvg=%.03f\n", avgAccTime);
-
-
 
 	return 0;
 	// pray for god, any god, any one who might be listening
