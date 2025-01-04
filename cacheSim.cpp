@@ -59,21 +59,29 @@ public:
 		return false;
 	}
 
-	bool accessed(std::vector<unsigned long int>::iterator x)
+	bool accessed(unsigned long int x)
 	{
-		if (x == this->elements.end())
+		// find it in the cache
+		auto i = this->elements.begin();
+		for (; i != this->elements.end(); i++)
 		{
-			// for the if case
+			if (*i == x)
+			{
+				// hit!
+				break;
+			}
+		}
+
+		if(i == this->elements.end())
+		{
+			// no found :(
 			return false;
 		}
 
-		int value = *x;
-		if (elements.back() != value)
-		{
-			// if he is not already last - they didn't say to optimize but like cmon
-			this->elements.erase(x);
-			this->elements.push_back(value);
-		}
+		unsigned long int value = *i;
+		this->elements.erase(i);
+		this->elements.push_back(value);
+
 		return true;
 	}
 
@@ -114,7 +122,7 @@ public:
 		return sets[set].exists(x);
 	}
 
-	bool accessed(unsigned long int set, std::vector<unsigned long int>::iterator x)
+	bool accessed(unsigned long int set, unsigned long int x)
 	{
 		return sets[set].accessed(x);
 	}
@@ -214,9 +222,8 @@ int main(int argc, char **argv)
 	//   ‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾‾
 	Cache L2 = Cache(L2Size, BSize, L2Assoc, WrAlloc);
 
-	
-	double L1MissRate = 0 ;
-	double L2MissRate= 0;
+	double L1MissRate = 0;
+	double L2MissRate = 0;
 	double accTimeCounter = 0;
 
 	while (getline(file, line))
@@ -254,13 +261,16 @@ int main(int argc, char **argv)
 
 		// TODO
 
-		// general concept:
+		// L1 access happens always:
 		accTimeCounter += L1Cyc;
+
 		if (L1.exists(set1, num))
 		{
 			// done i think
 			// accessed
+			L1.accessed(set1, num);
 			// hit L1 ++ , + count time
+			// if write then dirty bit?
 		}
 		else
 		{
@@ -289,21 +299,20 @@ int main(int argc, char **argv)
 			{
 				accTimeCounter += MemCyc;
 				// write allocate upon L2 miss:
-				/* 
-				
-				
-				
+				/*
+
+
+
 				*/
-				// if L2 got a new line and a line got evicted from it - we need 
+				// if L2 got a new line and a line got evicted from it - we need
 				// to check if L1 containg this line and if so remove it from there as well
 
-				// bring from memory 
+				// bring from memory
 				// if WB2, WB to L2, if WB1 also WB to L1
 			}
 		}
 	}
 
-	
 	double avgAccTime;
 
 	// finally: printing
