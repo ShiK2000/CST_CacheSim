@@ -91,6 +91,19 @@ public:
 		this->elements.erase(elements.begin());
 		return deleted;
 	}
+
+	bool removeSpecifically (unsigned long int fucker)
+	{
+		for (auto i = this->elements.begin(); i != this->elements.end(); i++)
+		{
+			if( (*i) == fucker)
+			{
+				this->elements.erase(i);
+				return true;
+			}
+		}
+		return false;
+	}
 };
 
 class Cache
@@ -130,6 +143,19 @@ public:
 	unsigned long int RemoveLRU(unsigned long int set)
 	{
 		return sets[set].RemoveLRU();
+	}
+
+	bool removeSpecifically (unsigned long int fucker)
+	{
+		for (auto i = sets.begin(); i != sets.end() ; i++)
+		{
+			if( (i->second).exists(fucker) )
+			{
+				(i->second).removeSpecifically(fucker);
+				return true;
+			}
+		}
+		return false;
 	}
 };
 
@@ -292,7 +318,7 @@ int main(int argc, char **argv)
 					// we need to add the line to L1 since it was used
 					if (!L1.add(set1, num))
 					{
-						// no space
+						// no space 
 						L1.RemoveLRU(set1);
 						L1.add(set1, num);
 					}
@@ -302,52 +328,43 @@ int main(int argc, char **argv)
 			}
 			else
 			{
-				// miss
+				// L2 miss as well
 				// failure is a habit by this point #ilovecs
 				L2MissRate++;
 				// we must access memory
 				accTimeCounter += MemCyc;
-
-				
-			}
-
-			// write allocate upon L1 miss:
-			if (operation == 'W')
-			{
-				// writing command
-				if (WrAlloc)
+				// ok but at what price
+				if(operation == 'R' || !WrAlloc)
 				{
-					// yes allocate
-					// write into L2 and L1
+					// the (changed/)line goes into L2 and then L1
+					if(!L2.add(set2, num))
+					{
+						// no space in L2
+						// kick a bitch out
+						unsigned long int v = L2.RemoveLRU(set2);
+						L1.removeSpecifically(v); // we don't know what set it is from so just remove him if he's there
+						 
+						// space was freed. add
+						L2.add(set2, num);
+					}
+					// ok the element was added to L2
+					// now L1:
+					if(!L1.add(set1, num))
+					{
+						// no space in L1
+						// kicking a bitch out again
+						unsigned long int v = L1.RemoveLRU(set1);
+						
+						// space was freed. add
+						L1.add(set1, num);
+					}
 				}
-				else
-				{
-					// no allocate
-					// baiscaly we invalidate the cache lines
-					// delete them from the simulator
-				}
+				//else
+					// no writing back, the change is only in memory and the cache is as oblivious as a three year old :)
+
 			}
 
-			// attemting L2:
-			if (L2.exists(set2, num))
-			{
-				// if WB1, WB to L1 and finish
-			}
-			else
-			{
-				accTimeCounter += MemCyc;
-				// write allocate upon L2 miss:
-				/*
-
-
-
-				*/
-				// if L2 got a new line and a line got evicted from it - we need
-				// to check if L1 containg this line and if so remove it from there as well
-
-				// bring from memory
-				// if WB2, WB to L2, if WB1 also WB to L1
-			}
+		
 		}
 	}
 
