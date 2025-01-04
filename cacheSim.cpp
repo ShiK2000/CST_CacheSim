@@ -72,7 +72,7 @@ public:
 			}
 		}
 
-		if(i == this->elements.end())
+		if (i == this->elements.end())
 		{
 			// no found :(
 			return false;
@@ -266,16 +266,51 @@ int main(int argc, char **argv)
 
 		if (L1.exists(set1, num))
 		{
-			// done i think
-			// accessed
+			// update LRU: accessed
 			L1.accessed(set1, num);
-			// hit L1 ++ , + count time
-			// if write then dirty bit?
 		}
 		else
 		{
-			accTimeCounter += L2Cyc;
 			// L1 miss
+			L1MissRate++;
+			// we now access L2
+			accTimeCounter += L2Cyc;
+
+			if (L2.exists(set2, num))
+			{
+				// l2 hit
+				// cache line was accessed
+				L2.accessed(set2, num);
+
+				// write allocate clause:
+				if (operation != 'W' || !WrAlloc)
+				{
+					// we need to update the data in L1
+					accTimeCounter += L1Cyc;
+
+					// we know for a fact that the line is NOT in L1
+					// we need to add the line to L1 since it was used
+					if (!L1.add(set1, num))
+					{
+						// no space
+						L1.RemoveLRU(set1);
+						L1.add(set1, num);
+					}
+				}
+				// else:
+				// 		we had a writing command but no write allocate - so we need not access L1
+			}
+			else
+			{
+				// miss
+				// failure is a habit by this point #ilovecs
+				L2MissRate++;
+				// we must access memory
+				accTimeCounter += MemCyc;
+
+				
+			}
+
 			// write allocate upon L1 miss:
 			if (operation == 'W')
 			{
@@ -283,10 +318,13 @@ int main(int argc, char **argv)
 				if (WrAlloc)
 				{
 					// yes allocate
+					// write into L2 and L1
 				}
 				else
 				{
 					// no allocate
+					// baiscaly we invalidate the cache lines
+					// delete them from the simulator
 				}
 			}
 
