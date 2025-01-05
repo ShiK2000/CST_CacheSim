@@ -125,10 +125,12 @@ private:
 public:
 	Cache(unsigned long int size, int blockSize, int assoc, int wr_alloc)
 	{
-
 		wr_alloc = wr_alloc;
-		numSets = (assoc == 0 ? size : size / (blockSize * assoc));
-		setSize = (assoc == 0 ? size : size / assoc);
+		// numSets = (assoc == 0 ? size : size / (blockSize * assoc));
+		// we loging, not decimaling
+		numSets = pow(2, size - blockSize * assoc);
+		// setSize = (assoc == 0 ? size : size / assoc);
+		setSize = pow(2, size - assoc);
 		associativity = assoc;
 		sets = std::map<unsigned long int, Way *>();
 	}
