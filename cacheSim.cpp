@@ -88,6 +88,7 @@ public:
 		}
 		unsigned long int deleted = *(this->elements.begin());
 		this->elements.erase(elements.begin());
+		this->currSize--;
 		return deleted;
 	}
 
@@ -116,7 +117,7 @@ public:
 class Cache
 {
 private:
-	std::map<unsigned long int, Way*> sets; // assuming all accessed addresses are valid, we do not need to limit or check the inputs into here
+	std::map<unsigned long int, Way *> sets; // assuming all accessed addresses are valid, we do not need to limit or check the inputs into here
 	int numSets;
 	int setSize;
 	int associativity;
@@ -126,11 +127,9 @@ public:
 	Cache(unsigned long int size, int blockSize, int assoc, int wr_alloc)
 	{
 		wr_alloc = wr_alloc;
-		// numSets = (assoc == 0 ? size : size / (blockSize * assoc));
 		// we loging, not decimaling
-		numSets = pow(2, size - blockSize * assoc);
-		// setSize = (assoc == 0 ? size : size / assoc);
-		setSize = pow(2, size - assoc);
+		setSize = pow(2, size - blockSize - assoc);
+		numSets = pow(2, assoc);
 		associativity = assoc;
 		sets = std::map<unsigned long int, Way *>();
 	}
@@ -190,7 +189,7 @@ public:
 
 	void stats()
 	{
-		for (auto i = sets.begin(); i != sets.end(); i++)
+		for (std::map<unsigned long, Way *>::iterator i = sets.begin(); i != sets.end(); i++)
 		{
 			cout << (*i).first << " ~";
 			(*i).second->stats();
@@ -312,9 +311,12 @@ int main(int argc, char **argv)
 		}
 
 		string cutAddress = address.substr(2); // Removing the "0x" part of the address
+		if (DEBUG)
+			cout << "curr string: " << cutAddress;
 		unsigned long int num = 0;
 		num = strtoul(cutAddress.c_str(), NULL, 16);
-
+		if (DEBUG)
+			cout << " aka " << num << endl;
 		// lets goooooo
 
 		// ok so we actually are looking only for top (size_of_num - block_size_in_log) digits
@@ -367,7 +369,6 @@ int main(int argc, char **argv)
 						L1.add(set1, num);
 					}
 					// we added to L1 so inclusivity is restored♥
-					
 				}
 				// else:
 				// 		we had a writing command but no write allocate - so we need not access L1
@@ -399,7 +400,7 @@ int main(int argc, char **argv)
 					// and also to L1
 					if (!L1.add(set1, num))
 					{
-						// no space 
+						// no space
 						// kick a bitch out
 						unsigned long int v = L1.RemoveLRU(set1);
 						L1.removeSpecifically(v); // we don't know what set it is from so just remove him if he's there
@@ -417,12 +418,14 @@ int main(int argc, char **argv)
 		if (DEBUG)
 		{
 			// std::cout << "l1: " << L1miss << " L2: " << L2miss << std::endl;
+			cout << "L1: ";
 			L1.stats();
 			cout << endl
-				 << endl;
+				 << endl
+				 << "L2: ";
 			L2.stats();
 			cout << endl
-				 << endl;
+				 << "------------------------------------------------------" << endl;
 			cout << endl
 				 << endl;
 		}
