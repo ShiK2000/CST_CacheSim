@@ -111,8 +111,9 @@ public:
 class Cache
 {
 private:
-	std::map<unsigned long int, Way> sets; // assuming all accessed addresses are valid, we do not need to limit or check the inputs into here
+	std::map<unsigned long int, Way*> sets; // assuming all accessed addresses are valid, we do not need to limit or check the inputs into here
 	int numSets;
+	int setSize;
 	int associativity;
 	bool wr_alloc;
 
@@ -121,39 +122,60 @@ public:
 	{
 		wr_alloc = wr_alloc;
 		numSets = size / (blockSize * assoc);
+		setSize = size / assoc;
 		associativity = assoc;
-		sets = std::map<unsigned long int, Way>();
+		sets = std::map<unsigned long int, Way*>();
 	}
-
+	~Cache()
+	{
+		for (std::map<unsigned long, Way *>::iterator i = sets.begin(); i != sets.end() ; i++)
+		{
+			delete[] (*i).second;
+		}
+		
+	}
+	bool affirmSetIsIn(unsigned long int x)
+	{
+		for (std::map<unsigned long, Way *>::iterator i = sets.begin(); i != sets.end() ; i++)
+		{
+			if((*i).first == x)
+			{
+				return true;
+			}
+		}
+		sets[x] = new Way(setSize);
+		return true;
+		
+	}
 	bool access(unsigned long int address, bool isWrite) {}
 
 	bool add(unsigned long int set, unsigned long int newComer)
 	{
-		return sets[set].add(newComer);
+		return sets[set]->add(newComer);
 	}
 
 	bool exists(unsigned long int set, unsigned long int x)
 	{
-		return sets[set].exists(x);
+		return sets[set]->exists(x);
 	}
 
 	bool accessed(unsigned long int set, unsigned long int x)
 	{
-		return sets[set].accessed(x);
+		return sets[set]->accessed(x);
 	}
 
 	unsigned long int RemoveLRU(unsigned long int set)
 	{
-		return sets[set].RemoveLRU();
+		return sets[set]->RemoveLRU();
 	}
 
 	bool removeSpecifically (unsigned long int fucker)
 	{
-		for (auto i = sets.begin(); i != sets.end() ; i++)
+		for (std::map<unsigned long, Way*>::iterator i = sets.begin(); i != sets.end() ; i++)
 		{
-			if( (i->second).exists(fucker) )
+			if( ((*i).second)->exists(fucker) )
 			{
-				(i->second).removeSpecifically(fucker);
+				((*i).second)->removeSpecifically(fucker);
 				return true;
 			}
 		}
@@ -233,7 +255,9 @@ int main(int argc, char **argv)
 		}
 	}
 	// lovely ♥
-	// now for the fun shit
+
+	int l1WaysSize = L1Size / L1Assoc;
+	int l2WaysSize = L2Size / L2Assoc;
 
 	// it's supposed to kinda be an array/vector of the cache type, with each cell corresponding to way
 	// not vibing with vector<cache> as then we'll need to monitor it's size but cache[L1Size] also feels weird
@@ -293,7 +317,12 @@ int main(int argc, char **argv)
 		unsigned long int set1 = num % (unsigned long int)(pow(10, setSize1));
 		unsigned long int set2 = num % (unsigned long int)(pow(10, setSize2));
 
-		// TODO
+		// if the sets aren't defined int the cache yes we should add them
+		// 	this is done automatically in the practical situation but i am trying to save us some 
+		// 	space by NOT hacing thousands of arrays hanging around.
+		L1.affirmSetIsIn(set1);
+		L2.affirmSetIsIn(set2);
+
 
 		// L1 access happens always:
 		accTimeCounter += L1Cyc;
