@@ -2,6 +2,7 @@
 #include <iostream>
 #include <fstream>
 #include <sstream>
+#include <cmath>
 
 // fuck everything i am not recreating something that alredy exists
 
@@ -31,7 +32,8 @@ public:
 		this->maxSize = size;
 		this->currSize = 0;
 	}
-	~Way() = default;
+	// we no use c++11
+	// ~Way() = default;
 
 	bool add(unsigned long int newComer)
 	{
@@ -47,7 +49,7 @@ public:
 
 	bool exists(unsigned long int x)
 	{
-		for (auto i = this->elements.begin(); i != this->elements.end(); i++)
+		for (std::vector<unsigned long>::iterator i = this->elements.begin(); i != this->elements.end(); i++)
 		{
 			if (*i == x)
 			{
@@ -62,7 +64,7 @@ public:
 	bool accessed(unsigned long int x)
 	{
 		// find it in the cache
-		auto i = this->elements.begin();
+		std::vector<unsigned long>::iterator i = this->elements.begin();
 		for (; i != this->elements.end(); i++)
 		{
 			if (*i == x)
@@ -94,7 +96,7 @@ public:
 
 	bool removeSpecifically (unsigned long int fucker)
 	{
-		for (auto i = this->elements.begin(); i != this->elements.end(); i++)
+		for (std::vector<unsigned long>::iterator i = this->elements.begin(); i != this->elements.end(); i++)
 		{
 			if( (*i) == fucker)
 			{
