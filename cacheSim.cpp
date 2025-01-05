@@ -69,21 +69,14 @@ public:
 			if (*i == x)
 			{
 				// hit!
-				break;
+				unsigned long int value = *i;
+				this->elements.erase(i);
+				this->elements.push_back(value);
+				return true;
 			}
 		}
-
-		if (i == this->elements.end())
-		{
-			// no found :(
-			return false;
-		}
-
-		unsigned long int value = *i;
-		this->elements.erase(i);
-		this->elements.push_back(value);
-
-		return true;
+		// no found :(
+		return false;
 	}
 
 	unsigned long int RemoveLRU()
@@ -110,12 +103,20 @@ public:
 		}
 		return false;
 	}
+
+	void stats()
+	{
+		for (std::vector<unsigned long>::iterator i = this->elements.begin(); i != elements.end(); i++)
+		{
+			cout << (*i) << " | ";
+		}
+	}
 };
 
 class Cache
 {
 private:
-	std::map<unsigned long int, Way *> sets; // assuming all accessed addresses are valid, we do not need to limit or check the inputs into here
+	std::map<unsigned long int, Way*> sets; // assuming all accessed addresses are valid, we do not need to limit or check the inputs into here
 	int numSets;
 	int setSize;
 	int associativity;
@@ -150,7 +151,7 @@ public:
 		sets[x] = new Way(setSize);
 		return sets[x] != NULL;
 	}
-	bool access(unsigned long int address, bool isWrite) {}
+	// bool access(unsigned long int address, bool isWrite) {}
 
 	bool add(unsigned long int set, unsigned long int newComer)
 	{
@@ -183,6 +184,16 @@ public:
 			}
 		}
 		return false;
+	}
+
+	void stats()
+	{
+		for (auto i = sets.begin(); i != sets.end(); i++)
+		{
+			cout << (*i).first << " ~";
+			(*i).second->stats();
+			cout << endl;
+		}
 	}
 };
 
@@ -306,8 +317,7 @@ int main(int argc, char **argv)
 
 		// ok so we actually are looking only for top (size_of_num - block_size_in_log) digits
 		// so the cache is represented by:
-		num = num / (pow(2, BSize));
-
+		num = num / (pow(2, BSize)); // removing BSize last bits is equal to dividing by 2^Bsize
 
 		// the indexes for accessing the elements in the Ls
 		unsigned long int set1 = num % (unsigned long int)(pow(2, L1Assoc));
@@ -342,19 +352,20 @@ int main(int argc, char **argv)
 				L2.accessed(set2, num);
 
 				// write allocate clause:
-				if (operation != 'w' || !WrAlloc)
+				if (operation != 'w' || WrAlloc) // anything but write in no write allocate
 				{
 					// we need to update the data in L1
 					accTimeCounter += L1Cyc;
 
 					// we know for a fact that the line is NOT in L1
-					// we need to add the line to L1 since it was used
 					if (!L1.add(set1, num))
 					{
 						// no space
 						L1.RemoveLRU(set1);
 						L1.add(set1, num);
 					}
+					// we added to L1 so inclusivity is restored♥
+					
 				}
 				// else:
 				// 		we had a writing command but no write allocate - so we need not access L1
@@ -367,8 +378,10 @@ int main(int argc, char **argv)
 				// we must access memory
 				accTimeCounter += MemCyc;
 				// ok but at what price
-				if (operation == 'r' || !WrAlloc)
+				if (operation == 'r' || WrAlloc)
 				{
+					// only skipping this if this is a write command with no write allocate
+
 					// the (changed/)line goes into L2 and then L1
 					if (!L2.add(set2, num))
 					{
@@ -381,12 +394,14 @@ int main(int argc, char **argv)
 						L2.add(set2, num);
 					}
 					// ok the element was added to L2
-					// now L1:
+					// and also to L1
 					if (!L1.add(set1, num))
 					{
-						// no space in L1
-						// kicking a bitch out again
+						// no space 
+						// kick a bitch out
 						unsigned long int v = L1.RemoveLRU(set1);
+						L1.removeSpecifically(v); // we don't know what set it is from so just remove him if he's there
+						// L2 is allowed to have stuff L1 doesn't have, so we can leave it at that
 
 						// space was freed. add
 						L1.add(set1, num);
@@ -395,9 +410,19 @@ int main(int argc, char **argv)
 				// else
 				//  no writing back, the change is only in memory and the cache is as oblivious as a three year old :)
 			}
+		}
 
-			if (DEBUG)
-				std::cout << "l1: " << L1miss << " L2: " << L2miss << std::endl;
+		if (DEBUG)
+		{
+			// std::cout << "l1: " << L1miss << " L2: " << L2miss << std::endl;
+			L1.stats();
+			cout << endl
+				 << endl;
+			L2.stats();
+			cout << endl
+				 << endl;
+			cout << endl
+				 << endl;
 		}
 	}
 	L1MissRate = (double)L1miss / L1acc;
