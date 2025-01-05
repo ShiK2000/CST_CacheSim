@@ -20,6 +20,7 @@ using std::stringstream;
 class Way // this is the behavior of the set
 {
 private:
+	// TODO - change elements to vector<tuple<uli, bool>>
 	std::vector<unsigned long int> elements;
 	int maxSize;
 	int currSize;
@@ -38,7 +39,7 @@ public:
 	{
 		if (currSize < maxSize)
 		{
-			// we good we can add a new friend
+			// we good we can add a new friend  // TODO	- make sure initial validation is true
 			this->elements.push_back(newComer);
 			this->currSize++;
 			return true;
@@ -46,7 +47,7 @@ public:
 		return false;
 	}
 
-	bool exists(unsigned long int x)
+	bool exists(unsigned long int x) // TODO - verify validity before jumping to conclusions
 	{
 		for (std::vector<unsigned long>::iterator i = this->elements.begin(); i != this->elements.end(); i++)
 		{
@@ -70,7 +71,7 @@ public:
 			{
 				// hit!
 				unsigned long int value = *i;
-				this->elements.erase(i);
+				this->elements.erase(i); // TODO - change into tuple - remember original validiy
 				this->elements.push_back(value);
 				return true;
 			}
@@ -341,7 +342,10 @@ cout << " that is entered as " << num << endl;
 		{
 			// update LRU: accessed
 			L1.accessed(set1, num);
-			
+
+			// if the operation is write, the matching element in L2 (that must exists cuz inclusivity) is no longer valid
+			// since we don't have write through we do not update the data.
+			// TODO
 		}
 		else
 		{
