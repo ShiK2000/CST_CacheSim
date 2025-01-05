@@ -107,9 +107,10 @@ public:
 
 	void stats()
 	{
+cout << " | ";
 		for (std::vector<unsigned long>::iterator i = this->elements.begin(); i != elements.end(); i++)
 		{
-			cout << (*i) << " | ";
+			cout  << (*i) << " | ";
 		}
 	}
 };
@@ -117,7 +118,7 @@ public:
 class Cache
 {
 private:
-	std::map<unsigned long int, Way *> sets; // assuming all accessed addresses are valid, we do not need to limit or check the inputs into here
+	std::map<unsigned long int, Way*> sets; // assuming all accessed addresses are valid, we do not need to limit or check the inputs into here
 	int numSets;
 	int setSize;
 	int associativity;
@@ -127,8 +128,10 @@ public:
 	Cache(unsigned long int size, int blockSize, int assoc, int wr_alloc)
 	{
 		wr_alloc = wr_alloc;
+		// numSets = (assoc == 0 ? size : size / (blockSize * assoc));
 		// we loging, not decimaling
 		setSize = pow(2, size - blockSize - assoc);
+		// setSize = (assoc == 0 ? size : size / assoc);
 		numSets = pow(2, assoc);
 		associativity = assoc;
 		sets = std::map<unsigned long int, Way *>();
@@ -311,18 +314,16 @@ int main(int argc, char **argv)
 		}
 
 		string cutAddress = address.substr(2); // Removing the "0x" part of the address
-		if (DEBUG)
-			cout << "curr string: " << cutAddress;
+cout << "curr string: " << cutAddress ;
 		unsigned long int num = 0;
 		num = strtoul(cutAddress.c_str(), NULL, 16);
-		if (DEBUG)
-			cout << " aka " << num << endl;
+cout << " aka " << num ;
 		// lets goooooo
 
 		// ok so we actually are looking only for top (size_of_num - block_size_in_log) digits
 		// so the cache is represented by:
 		num = num / (pow(2, BSize)); // removing BSize last bits is equal to dividing by 2^Bsize
-
+cout << " that is entered as " << num << endl;
 		// the indexes for accessing the elements in the Ls
 		unsigned long int set1 = num % (unsigned long int)(pow(2, L1Assoc));
 		unsigned long int set2 = num % (unsigned long int)(pow(2, L2Assoc));
@@ -340,6 +341,7 @@ int main(int argc, char **argv)
 		{
 			// update LRU: accessed
 			L1.accessed(set1, num);
+			
 		}
 		else
 		{
@@ -350,7 +352,7 @@ int main(int argc, char **argv)
 			accTimeCounter += L2Cyc;
 
 			if (L2.exists(set2, num))
-			{
+			{cout << "l2 hit meow [there is one impostor among us]" << endl;
 				// l2 hit
 				// cache line was accessed
 				L2.accessed(set2, num);
@@ -369,6 +371,7 @@ int main(int argc, char **argv)
 						L1.add(set1, num);
 					}
 					// we added to L1 so inclusivity is restored♥
+					
 				}
 				// else:
 				// 		we had a writing command but no write allocate - so we need not access L1
@@ -400,7 +403,7 @@ int main(int argc, char **argv)
 					// and also to L1
 					if (!L1.add(set1, num))
 					{
-						// no space
+						// no space 
 						// kick a bitch out
 						unsigned long int v = L1.RemoveLRU(set1);
 						L1.removeSpecifically(v); // we don't know what set it is from so just remove him if he's there
@@ -418,21 +421,21 @@ int main(int argc, char **argv)
 		if (DEBUG)
 		{
 			// std::cout << "l1: " << L1miss << " L2: " << L2miss << std::endl;
-			cout << "L1: ";
+			cout << "L1: " << endl;
 			L1.stats();
 			cout << endl
-				 << endl
-				 << "L2: ";
+				 << endl << "L2: " << endl;
 			L2.stats();
-			cout << endl
-				 << "------------------------------------------------------" << endl;
+			cout <<  endl
+				 << "------------------------------------------------------"<< endl;
 			cout << endl
 				 << endl;
 		}
 	}
 	L1MissRate = (double)L1miss / L1acc;
 	L2MissRate = (double)L2miss / L2acc;
-
+	cout << "ok so L1miss is " << L1miss << " and L2 iss is " << L2miss << endl;
+	cout << "L1acc " << L1acc << " and 2 " << L2acc << endl;  
 	double avgAccTime;
 	// we access l1 exactly once for each access we attempt
 	avgAccTime = accTimeCounter / L1acc;
