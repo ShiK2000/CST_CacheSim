@@ -252,6 +252,12 @@ int main(int argc, char **argv)
 	double L2MissRate = 0;
 	double accTimeCounter = 0;
 
+	int L1miss = 0;
+	int L2miss = 0;
+	int L1acc = 0;
+	int L2acc = 0;
+
+
 	while (getline(file, line))
 	{
 
@@ -289,7 +295,7 @@ int main(int argc, char **argv)
 
 		// L1 access happens always:
 		accTimeCounter += L1Cyc;
-
+		L1acc++;
 		if (L1.exists(set1, num))
 		{
 			// update LRU: accessed
@@ -298,8 +304,9 @@ int main(int argc, char **argv)
 		else
 		{
 			// L1 miss
-			L1MissRate++;
+			L1miss++;
 			// we now access L2
+			L2acc++;
 			accTimeCounter += L2Cyc;
 
 			if (L2.exists(set2, num))
@@ -330,7 +337,7 @@ int main(int argc, char **argv)
 			{
 				// L2 miss as well
 				// failure is a habit by this point #ilovecs
-				L2MissRate++;
+				L2miss++;
 				// we must access memory
 				accTimeCounter += MemCyc;
 				// ok but at what price
@@ -367,9 +374,13 @@ int main(int argc, char **argv)
 		
 		}
 	}
+	L1MissRate = L1miss / L1acc;
+	L2MissRate = L2miss / L2acc;
+
 
 	double avgAccTime;
-
+	// we access l1 exactly once for each access we attempt
+	avgAccTime = accTimeCounter/L1acc; 
 	// finally: printing
 	printf("L1miss=%.03f ", L1MissRate);
 	printf("L2miss=%.03f ", L2MissRate);
