@@ -306,13 +306,12 @@ int main(int argc, char **argv)
 
 		// ok so we actually are looking only for top (size_of_num - block_size_in_log) digits
 		// so the cache is represented by:
-		num = num / (pow(10, BSize));
-		int setSize1 = L1Assoc;
-		int setSize2 = L2Assoc;
+		num = num / (pow(2, BSize));
+
 
 		// the indexes for accessing the elements in the Ls
-		unsigned long int set1 = num % (unsigned long int)(pow(10, setSize1));
-		unsigned long int set2 = num % (unsigned long int)(pow(10, setSize2));
+		unsigned long int set1 = num % (unsigned long int)(pow(2, L1Assoc));
+		unsigned long int set2 = num % (unsigned long int)(pow(2, L2Assoc));
 
 		// if the sets aren't defined int the cache yes we should add them
 		// 	this is done automatically in the practical situation but i am trying to save us some
@@ -343,7 +342,7 @@ int main(int argc, char **argv)
 				L2.accessed(set2, num);
 
 				// write allocate clause:
-				if (operation != 'W' || !WrAlloc)
+				if (operation != 'w' || !WrAlloc)
 				{
 					// we need to update the data in L1
 					accTimeCounter += L1Cyc;
@@ -368,7 +367,7 @@ int main(int argc, char **argv)
 				// we must access memory
 				accTimeCounter += MemCyc;
 				// ok but at what price
-				if (operation == 'R' || !WrAlloc)
+				if (operation == 'r' || !WrAlloc)
 				{
 					// the (changed/)line goes into L2 and then L1
 					if (!L2.add(set2, num))
