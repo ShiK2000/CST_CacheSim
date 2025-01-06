@@ -17,11 +17,38 @@ using std::ifstream;
 using std::string;
 using std::stringstream;
 
+class Cacheline
+{
+private:
+	unsigned long int block;
+	bool valildity;
+
+public:
+	Cacheline(unsigned long int x)
+	{
+		block = x;
+		valildity = true;
+	}
+
+	bool operator==(const Cacheline &b) const
+	{
+		return this->block == b.block && this->valildity == b.valildity;
+	}
+	void invalidate()
+	{
+		this->valildity = false;
+	}
+	unsigned long int value()
+	{
+		return block;
+	}
+};
+
 class Way // this is the behavior of the set
 {
 private:
 	// TODO - change elements to vector<tuple<uli, bool>>
-	std::vector<unsigned long int> elements;
+	std::vector<Cacheline *> elements;
 	int maxSize;
 	int currSize;
 
@@ -33,14 +60,20 @@ public:
 		this->currSize = 0;
 	}
 	// we no use c++11
-	// ~Way() = default;
+	~Way()
+	{
+		for (std::vector<Cacheline *>::iterator i = elements.begin(); i != elements.end(); i++)
+		{
+			delete (*i);
+		}
+	}
 
 	bool add(unsigned long int newComer)
 	{
 		if (currSize < maxSize)
 		{
 			// we good we can add a new friend  // TODO	- make sure initial validation is true
-			this->elements.push_back(newComer);
+			this->elements.push_back(new Cacheline(newComer));
 			this->currSize++;
 			return true;
 		}
@@ -49,11 +82,12 @@ public:
 
 	bool exists(unsigned long int x) // TODO - verify validity before jumping to conclusions
 	{
-		for (std::vector<unsigned long>::iterator i = this->elements.begin(); i != this->elements.end(); i++)
+		for (std::vector<Cacheline *>::iterator i = this->elements.begin(); i != this->elements.end(); i++)
 		{
-			if (*i == x)
+			if (*(*i) == Cacheline(x))
 			{
 				// hit!
+				// its there and its VALID
 				return true;
 			}
 		}
@@ -61,17 +95,28 @@ public:
 		return false;
 	}
 
+	void invalidate(unsigned long int x)
+	{
+		for (std::vector<Cacheline *>::iterator i = this->elements.begin(); i != this->elements.end(); i++)
+		{
+			if (*(*i) == Cacheline(x))
+			{
+				(*i)->invalidate();
+			}
+		}
+	}
+
 	bool accessed(unsigned long int x)
 	{
 		// find it in the cache
-		std::vector<unsigned long>::iterator i = this->elements.begin();
+		std::vector<Cacheline *>::iterator i = this->elements.begin();
 		for (; i != this->elements.end(); i++)
 		{
-			if (*i == x)
+			if (**i == Cacheline(x))
 			{
 				// hit!
-				unsigned long int value = *i;
-				this->elements.erase(i); // TODO - change into tuple - remember original validiy
+				Cacheline *value = *i;
+				this->elements.erase(i); // since it is a basic pointer it doesn't get deleted, and i am holding him do we don't lost him.
 				this->elements.push_back(value);
 				return true;
 			}
@@ -87,18 +132,23 @@ public:
 		{
 			return -1;
 		}
-		unsigned long int deleted = *(this->elements.begin());
+		
+		Cacheline *deleted = *(this->elements.begin());
+		unsigned long int rip = deleted->value();
+
+		delete deleted; // bye bye bye
 		this->elements.erase(elements.begin());
 		this->currSize--;
-		return deleted;
+		return rip;
 	}
 
 	bool removeSpecifically(unsigned long int fucker)
 	{
-		for (std::vector<unsigned long>::iterator i = this->elements.begin(); i != this->elements.end(); i++)
+		for (std::vector<Cacheline *>::iterator i = this->elements.begin(); i != this->elements.end(); i++)
 		{
-			if ((*i) == fucker)
+			if (*(*i) == Cacheline(fucker))
 			{
+				delete *i;
 				this->elements.erase(i);
 				return true;
 			}
@@ -108,10 +158,10 @@ public:
 
 	void stats()
 	{
-cout << " | ";
-		for (std::vector<unsigned long>::iterator i = this->elements.begin(); i != elements.end(); i++)
+		cout << " | ";
+		for (std::vector<Cacheline *>::iterator i = this->elements.begin(); i != elements.end(); i++)
 		{
-			cout  << (*i) << " | ";
+			cout << (*i) << " | ";
 		}
 	}
 };
@@ -119,7 +169,7 @@ cout << " | ";
 class Cache
 {
 private:
-	std::map<unsigned long int, Way*> sets; // assuming all accessed addresses are valid, we do not need to limit or check the inputs into here
+	std::map<unsigned long int, Way *> sets; // assuming all accessed addresses are valid, we do not need to limit or check the inputs into here
 	int numSets;
 	int setSize;
 	int associativity;
@@ -191,6 +241,10 @@ public:
 		return false;
 	}
 
+	void invalidate(unsigned long int set, unsigned long int x)
+	{
+		sets[set]->invalidate(x);
+	}
 	void stats()
 	{
 		for (std::map<unsigned long, Way *>::iterator i = sets.begin(); i != sets.end(); i++)
@@ -315,16 +369,16 @@ int main(int argc, char **argv)
 		}
 
 		string cutAddress = address.substr(2); // Removing the "0x" part of the address
-cout << "curr string: " << cutAddress ;
+		cout << "curr string: " << cutAddress;
 		unsigned long int num = 0;
 		num = strtoul(cutAddress.c_str(), NULL, 16);
-cout << " aka " << num ;
+		cout << " aka " << num;
 		// lets goooooo
 
 		// ok so we actually are looking only for top (size_of_num - block_size_in_log) digits
 		// so the cache is represented by:
 		num = num / (pow(2, BSize)); // removing BSize last bits is equal to dividing by 2^Bsize
-cout << " that is entered as " << num << endl;
+		cout << " that is entered as " << num << endl;
 		// the indexes for accessing the elements in the Ls
 		unsigned long int set1 = num % (unsigned long int)(pow(2, L1Assoc));
 		unsigned long int set2 = num % (unsigned long int)(pow(2, L2Assoc));
@@ -345,7 +399,11 @@ cout << " that is entered as " << num << endl;
 
 			// if the operation is write, the matching element in L2 (that must exists cuz inclusivity) is no longer valid
 			// since we don't have write through we do not update the data.
-			// TODO
+			
+			if(operation == 'w')
+			{
+				L2.invalidate(set2, num);
+			}
 		}
 		else
 		{
@@ -356,7 +414,8 @@ cout << " that is entered as " << num << endl;
 			accTimeCounter += L2Cyc;
 
 			if (L2.exists(set2, num))
-			{cout << "l2 hit meow [there is one impostor among us]" << endl;
+			{
+				cout << "l2 hit meow [there is one impostor among us]" << endl;
 				// l2 hit
 				// cache line was accessed
 				L2.accessed(set2, num);
@@ -375,7 +434,6 @@ cout << " that is entered as " << num << endl;
 						L1.add(set1, num);
 					}
 					// we added to L1 so inclusivity is restored♥
-					
 				}
 				// else:
 				// 		we had a writing command but no write allocate - so we need not access L1
@@ -407,7 +465,7 @@ cout << " that is entered as " << num << endl;
 					// and also to L1
 					if (!L1.add(set1, num))
 					{
-						// no space 
+						// no space
 						// kick a bitch out
 						unsigned long int v = L1.RemoveLRU(set1);
 						L1.removeSpecifically(v); // we don't know what set it is from so just remove him if he's there
@@ -428,10 +486,11 @@ cout << " that is entered as " << num << endl;
 			cout << "L1: " << endl;
 			L1.stats();
 			cout << endl
-				 << endl << "L2: " << endl;
+				 << endl
+				 << "L2: " << endl;
 			L2.stats();
-			cout <<  endl
-				 << "------------------------------------------------------"<< endl;
+			cout << endl
+				 << "------------------------------------------------------" << endl;
 			cout << endl
 				 << endl;
 		}
@@ -439,7 +498,7 @@ cout << " that is entered as " << num << endl;
 	L1MissRate = (double)L1miss / L1acc;
 	L2MissRate = (double)L2miss / L2acc;
 	cout << "ok so L1miss is " << L1miss << " and L2 iss is " << L2miss << endl;
-	cout << "L1acc " << L1acc << " and 2 " << L2acc << endl;  
+	cout << "L1acc " << L1acc << " and 2 " << L2acc << endl;
 	double avgAccTime;
 	// we access l1 exactly once for each access we attempt
 	avgAccTime = accTimeCounter / L1acc;
