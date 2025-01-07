@@ -418,7 +418,7 @@ int main(int argc, char **argv)
 
 		string cutAddress = address.substr(2); // Removing the "0x" part of the address
 		// cout << "curr string: " << cutAddress;
-		unsigned long int num = 0;
+		unsigned long int num = 0; 
 		num = strtoul(cutAddress.c_str(), NULL, 16);
 		// lets goooooo
 
