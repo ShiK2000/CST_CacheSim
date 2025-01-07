@@ -8,7 +8,7 @@
 const int DEBUG = 1;
 #include <vector>
 #include <map>
-
+ 
 using std::cerr;
 using std::cout;
 using std::endl;
