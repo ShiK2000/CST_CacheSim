@@ -52,10 +52,9 @@ public:
 	}
 };
 
-class Way // this is the behavior of the set
+class Way 
 {
 private:
-	// TODO - change elements to vector<tuple<uli, bool>>
 	std::vector<Cacheline *> elements;
 	int maxSize;
 	int currSize;
@@ -94,7 +93,6 @@ public:
 		// else way, we need to add him forcibly
 		if (currSize < maxSize)
 		{
-			// we good we can add a new friend  // TODO	- make sure initial validation is true
 			this->elements.push_back(new Cacheline(newComer));
 			this->currSize++;
 			return true;
@@ -102,7 +100,7 @@ public:
 		return false;
 	}
 
-	bool exists(unsigned long int x) // TODO - verify validity before jumping to conclusions
+	bool exists(unsigned long int x) 
 	{
 		for (std::vector<Cacheline *>::iterator i = this->elements.begin(); i != this->elements.end(); i++)
 		{
@@ -520,7 +518,7 @@ int main(int argc, char **argv)
 						Cacheline v = L1.RemoveLRU(set1);
 						// L2 is allowed to have stuff L1 doesn't have, so we can leave it at that
 
-						// TODO : if that element was modified, we'd have to update his data in L2, meaning it was accessed in L2
+						// if that element was modified, we'd have to update his data in L2, meaning it was accessed in L2
 						if (!v.validity())
 						{
 							// there was a modification.
@@ -544,7 +542,7 @@ int main(int argc, char **argv)
 			}
 		}
 
-		if (DEBUG)
+		if (DEBUG) // honeslty the whole this is great but my debugging functions fucking SLAYED i deserve extra point for it
 		{
 			// std::cout << "l1: " << L1miss << " L2: " << L2miss << std::endl;
 			cout << "L1: " << endl;
@@ -574,3 +572,4 @@ int main(int argc, char **argv)
 	return 0;
 	// pray for god, any god, any one who might be listening
 }
+// i almost hope this will get flagged so someone will read my shitposting
