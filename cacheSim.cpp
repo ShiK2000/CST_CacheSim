@@ -38,9 +38,17 @@ public:
 	{
 		this->valildity = false;
 	}
+	void revalidate()
+	{
+		this->valildity = true;
+	}
 	unsigned long int value()
 	{
 		return block;
+	}
+	bool validity()
+	{
+		return valildity;
 	}
 };
 
@@ -70,6 +78,20 @@ public:
 
 	bool add(unsigned long int newComer)
 	{
+		// first let's check if it is there just invalidly
+		Cacheline iv(newComer);
+		iv.invalidate();
+		for (std::vector<Cacheline *>::iterator i = this->elements.begin(); i != this->elements.end(); i++)
+		{
+			if (*(*i) == iv)
+			{
+				// yup
+				// updating this one
+				(*i)->revalidate();
+				return true;
+			}
+		}
+		// else way, we need to add him forcibly
 		if (currSize < maxSize)
 		{
 			// we good we can add a new friend  // TODO	- make sure initial validation is true
@@ -88,6 +110,23 @@ public:
 			{
 				// hit!
 				// its there and its VALID
+				return true;
+			}
+		}
+		// miss :(
+		return false;
+	}
+
+	bool existdInvalidOrValid(unsigned long int x)
+	{
+		Cacheline inv(x);
+		inv.invalidate();
+		for (std::vector<Cacheline *>::iterator i = this->elements.begin(); i != this->elements.end(); i++)
+		{
+			if (*(*i) == Cacheline(x) || **i == inv)
+			{
+				// hit!
+				// its there
 				return true;
 			}
 		}
@@ -125,31 +164,36 @@ public:
 		return false;
 	}
 
-	unsigned long int RemoveLRU()
+	Cacheline RemoveLRU()
 	{
 		// not possible but just in case
 		if (this->elements.empty())
 		{
 			return -1;
 		}
-		
+
 		Cacheline *deleted = *(this->elements.begin());
 		unsigned long int rip = deleted->value();
-
+		Cacheline ri(rip);
+		if (!deleted->validity())
+		{
+			ri.invalidate();
+		}
 		delete deleted; // bye bye bye
 		this->elements.erase(elements.begin());
 		this->currSize--;
-		return rip;
+		return ri;
 	}
 
 	bool removeSpecifically(unsigned long int fucker)
 	{
 		for (std::vector<Cacheline *>::iterator i = this->elements.begin(); i != this->elements.end(); i++)
 		{
-			if (*(*i) == Cacheline(fucker))
+			if ((*i)->value() == fucker)
 			{
 				delete *i;
 				this->elements.erase(i);
+				this->currSize--;
 				return true;
 			}
 		}
@@ -161,7 +205,7 @@ public:
 		cout << " | ";
 		for (std::vector<Cacheline *>::iterator i = this->elements.begin(); i != elements.end(); i++)
 		{
-			cout << (*i) << " | ";
+			cout << (*i)->value() << " v: " << (*i)->validity() << " | ";
 		}
 	}
 };
@@ -171,20 +215,18 @@ class Cache
 private:
 	std::map<unsigned long int, Way *> sets; // assuming all accessed addresses are valid, we do not need to limit or check the inputs into here
 	int numSets;
-	int setSize;
-	int associativity;
+	int waySize;
+	// int associativity;
 	bool wr_alloc;
 
 public:
 	Cache(unsigned long int size, int blockSize, int assoc, int wr_alloc)
 	{
 		wr_alloc = wr_alloc;
-		// numSets = (assoc == 0 ? size : size / (blockSize * assoc));
 		// we loging, not decimaling
-		setSize = pow(2, size - blockSize - assoc);
-		// setSize = (assoc == 0 ? size : size / assoc);
-		numSets = pow(2, assoc);
-		associativity = assoc;
+		numSets = pow(2, size - blockSize - assoc); // we have no control over it but it is kept by the % operation
+		waySize = pow(2, assoc);
+		// associativity = assoc;
 		sets = std::map<unsigned long int, Way *>();
 	}
 	~Cache()
@@ -203,7 +245,7 @@ public:
 				return true;
 			}
 		}
-		sets[x] = new Way(setSize);
+		sets[x] = new Way(waySize);
 		return sets[x] != NULL;
 	}
 	// bool access(unsigned long int address, bool isWrite) {}
@@ -218,12 +260,17 @@ public:
 		return sets[set]->exists(x);
 	}
 
+	bool existsInvOrVal(unsigned long int set, unsigned long int x)
+	{
+		return sets[set]->existdInvalidOrValid(x);
+	}
+
 	bool accessed(unsigned long int set, unsigned long int x)
 	{
 		return sets[set]->accessed(x);
 	}
 
-	unsigned long int RemoveLRU(unsigned long int set)
+	Cacheline RemoveLRU(unsigned long int set)
 	{
 		return sets[set]->RemoveLRU();
 	}
@@ -232,9 +279,10 @@ public:
 	{
 		for (std::map<unsigned long, Way *>::iterator i = sets.begin(); i != sets.end(); i++)
 		{
-			if (((*i).second)->exists(fucker))
+			if (((*i).second)->existdInvalidOrValid(fucker))  // when removing it can be either valid or invalid we don't care
 			{
 				((*i).second)->removeSpecifically(fucker);
+
 				return true;
 			}
 		}
@@ -369,23 +417,24 @@ int main(int argc, char **argv)
 		}
 
 		string cutAddress = address.substr(2); // Removing the "0x" part of the address
-		cout << "curr string: " << cutAddress;
+		// cout << "curr string: " << cutAddress;
 		unsigned long int num = 0;
 		num = strtoul(cutAddress.c_str(), NULL, 16);
-		cout << " aka " << num;
 		// lets goooooo
 
 		// ok so we actually are looking only for top (size_of_num - block_size_in_log) digits
 		// so the cache is represented by:
 		num = num / (pow(2, BSize)); // removing BSize last bits is equal to dividing by 2^Bsize
-		cout << " that is entered as " << num << endl;
-		// the indexes for accessing the elements in the Ls
-		unsigned long int set1 = num % (unsigned long int)(pow(2, L1Assoc));
-		unsigned long int set2 = num % (unsigned long int)(pow(2, L2Assoc));
 
+		// the indexes for accessing the elements in the Ls
+		//pow(2, size - blockSize - assoc)
+		unsigned long int set1 = num % (unsigned long int)(pow(2, L1Size - L1Assoc - BSize));
+		unsigned long int set2 = num % (unsigned long int)(pow(2, L2Size - L2Assoc - BSize));
+		if (DEBUG)
+			cout << "set1: " << set1 << " and set 2: " << set2 << endl;
 		// if the sets aren't defined int the cache yes we should add them
 		// 	this is done automatically in the practical situation but i am trying to save us some
-		// 	space by NOT hacing thousands of arrays hanging around.
+		// 	space by NOT having thousands of arrays hanging around.
 		L1.affirmSetIsIn(set1);
 		L2.affirmSetIsIn(set2);
 
@@ -399,10 +448,11 @@ int main(int argc, char **argv)
 
 			// if the operation is write, the matching element in L2 (that must exists cuz inclusivity) is no longer valid
 			// since we don't have write through we do not update the data.
-			
-			if(operation == 'w')
+
+			if (operation == 'w')
 			{
 				L2.invalidate(set2, num);
+				L2.accessed(set2, num);
 			}
 		}
 		else
@@ -415,7 +465,6 @@ int main(int argc, char **argv)
 
 			if (L2.exists(set2, num))
 			{
-				cout << "l2 hit meow [there is one impostor among us]" << endl;
 				// l2 hit
 				// cache line was accessed
 				L2.accessed(set2, num);
@@ -424,7 +473,7 @@ int main(int argc, char **argv)
 				if (operation != 'w' || WrAlloc) // anything but write in no write allocate
 				{
 					// we need to update the data in L1
-					accTimeCounter += L1Cyc;
+					// accTimeCounter += L1Cyc;
 
 					// we know for a fact that the line is NOT in L1
 					if (!L1.add(set1, num))
@@ -433,7 +482,6 @@ int main(int argc, char **argv)
 						L1.RemoveLRU(set1);
 						L1.add(set1, num);
 					}
-					// we added to L1 so inclusivity is restored♥
 				}
 				// else:
 				// 		we had a writing command but no write allocate - so we need not access L1
@@ -449,13 +497,14 @@ int main(int argc, char **argv)
 				if (operation == 'r' || WrAlloc)
 				{
 					// only skipping this if this is a write command with no write allocate
-
 					// the (changed/)line goes into L2 and then L1
+
 					if (!L2.add(set2, num))
 					{
 						// no space in L2
 						// kick a bitch out
-						unsigned long int v = L2.RemoveLRU(set2);
+						unsigned long int v = L2.RemoveLRU(set2).value();
+						// L1.invalidate(v % (unsigned long int)(pow(2, L1Assoc)))
 						L1.removeSpecifically(v); // we don't know what set it is from so just remove him if he's there
 
 						// space was freed. add
@@ -463,17 +512,32 @@ int main(int argc, char **argv)
 					}
 					// ok the element was added to L2
 					// and also to L1
+
 					if (!L1.add(set1, num))
 					{
 						// no space
 						// kick a bitch out
-						unsigned long int v = L1.RemoveLRU(set1);
-						L1.removeSpecifically(v); // we don't know what set it is from so just remove him if he's there
+						Cacheline v = L1.RemoveLRU(set1);
 						// L2 is allowed to have stuff L1 doesn't have, so we can leave it at that
 
+						// TODO : if that element was modified, we'd have to update his data in L2, meaning it was accessed in L2
+						if (!v.validity())
+						{
+							// there was a modification.
+							// the update is done in background, but the elements was accessed
+							// since it's a random element,we don't know it's set but we can calculate it:
+							unsigned long int set2too = v.value() % (unsigned long int)(pow(2, L2Assoc));
+							L2.accessed(set2too, v.value());
+						}
 						// space was freed. add
 						L1.add(set1, num);
 					}
+				}
+				if (operation == 'w')
+				{
+					// finaly, write:
+					// writing only in L1
+					L1.invalidate(set1, num);
 				}
 				// else
 				//  no writing back, the change is only in memory and the cache is as oblivious as a three year old :)
