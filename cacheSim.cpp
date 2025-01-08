@@ -8,7 +8,7 @@
 const int DEBUG = 1;
 #include <vector>
 #include <map>
- 
+
 using std::cerr;
 using std::cout;
 using std::endl;
@@ -52,7 +52,7 @@ public:
 	}
 };
 
-class Way 
+class Way
 {
 private:
 	std::vector<Cacheline *> elements;
@@ -85,7 +85,7 @@ public:
 			if (*(*i) == iv)
 			{
 				// yup
-				// updating this one
+				// updating this one then:
 				(*i)->revalidate();
 				return true;
 			}
@@ -100,7 +100,7 @@ public:
 		return false;
 	}
 
-	bool exists(unsigned long int x) 
+	bool exists(unsigned long int x)
 	{
 		for (std::vector<Cacheline *>::iterator i = this->elements.begin(); i != this->elements.end(); i++)
 		{
@@ -139,6 +139,17 @@ public:
 			if (*(*i) == Cacheline(x))
 			{
 				(*i)->invalidate();
+			}
+		}
+	}
+
+	void revalidate(unsigned long int x)
+	{
+		for (std::vector<Cacheline *>::iterator i = this->elements.begin(); i != this->elements.end(); i++)
+		{
+			if ((*i)->value() == x)
+			{
+				(*i)->revalidate();
 			}
 		}
 	}
@@ -277,7 +288,7 @@ public:
 	{
 		for (std::map<unsigned long, Way *>::iterator i = sets.begin(); i != sets.end(); i++)
 		{
-			if (((*i).second)->existdInvalidOrValid(fucker))  // when removing it can be either valid or invalid we don't care
+			if (((*i).second)->existdInvalidOrValid(fucker)) // when removing it can be either valid or invalid we don't care
 			{
 				((*i).second)->removeSpecifically(fucker);
 
@@ -290,6 +301,10 @@ public:
 	void invalidate(unsigned long int set, unsigned long int x)
 	{
 		sets[set]->invalidate(x);
+	}
+	void revalidate(unsigned long int set, unsigned long int x)
+	{
+		sets[set]->revalidate(x);
 	}
 	void stats()
 	{
@@ -415,8 +430,9 @@ int main(int argc, char **argv)
 		}
 
 		string cutAddress = address.substr(2); // Removing the "0x" part of the address
-		// cout << "curr string: " << cutAddress;
-		unsigned long int num = 0; 
+		if (DEBUG)
+			cout << "curr string: " << cutAddress << endl;
+		unsigned long int num = 0;
 		num = strtoul(cutAddress.c_str(), NULL, 16);
 		// lets goooooo
 
@@ -425,7 +441,7 @@ int main(int argc, char **argv)
 		num = num / (pow(2, BSize)); // removing BSize last bits is equal to dividing by 2^Bsize
 
 		// the indexes for accessing the elements in the Ls
-		//pow(2, size - blockSize - assoc)
+		// pow(2, size - blockSize - assoc)
 		unsigned long int set1 = num % (unsigned long int)(pow(2, L1Size - L1Assoc - BSize));
 		unsigned long int set2 = num % (unsigned long int)(pow(2, L2Size - L2Assoc - BSize));
 		if (DEBUG)
@@ -441,16 +457,17 @@ int main(int argc, char **argv)
 		L1acc++;
 		if (L1.exists(set1, num))
 		{
+			// valid in L1
 			// update LRU: accessed
 			L1.accessed(set1, num);
 
 			// if the operation is write, the matching element in L2 (that must exists cuz inclusivity) is no longer valid
 			// since we don't have write through we do not update the data.
 
-			if (operation == 'w')
+			if (operation == 'w') // else way it's a read and we do not
 			{
 				L2.invalidate(set2, num);
-				L2.accessed(set2, num);
+				L2.accessed(set2, num); // the internet say no but question 25 in piazza say yes
 			}
 		}
 		else
@@ -463,7 +480,7 @@ int main(int argc, char **argv)
 
 			if (L2.exists(set2, num))
 			{
-				// l2 hit
+				// l2 valid hit
 				// cache line was accessed
 				L2.accessed(set2, num);
 
@@ -477,8 +494,25 @@ int main(int argc, char **argv)
 					if (!L1.add(set1, num))
 					{
 						// no space
-						L1.RemoveLRU(set1);
+						// if that element was modified, we'd have to update his data in L2, meaning it was accessed in L2
+						Cacheline v = L1.RemoveLRU(set1);
+
+						// if that element was modified, we'd have to update his data in L2, meaning it was accessed in L2
+						// either way we need to access the block, and in the end it must be valid
+						// since it's a random element,we don't know it's set but we can calculate it:
+						unsigned long int set2too = v.value() % (unsigned long int)(pow(2, L2Size - L2Assoc - BSize));
+						L2.accessed(set2too, v.value());
+						L2.revalidate(set2too, v.value());
+
+
 						L1.add(set1, num);
+					}
+
+					// if we did wrtie, then the l2 is invalid now
+					if (operation == 'w')
+					{
+						// sorry for doing it twice lol
+						L2.invalidate(set2, num);
 					}
 				}
 				// else:
@@ -486,6 +520,55 @@ int main(int argc, char **argv)
 			}
 			else
 			{
+				if (operation == 'w' && L2.existsInvOrVal(set2, num))
+				{
+					// L2 hit but only for write
+					// L1 miss so for sure it wasn't there
+					// we can't read this element, but we can write into it
+					// ~we updated the data~ [no command cuz sim]
+					// L2.revalidate(set2, num);
+					L2.accessed(set2, num);
+
+					// again, we know for a fact that the line is NOT in L1
+					if (!L1.add(set1, num))
+					{
+						// no space
+						Cacheline v = L1.RemoveLRU(set1);
+
+						// if that element was modified, we'd have to update his data in L2, meaning it was accessed in L2
+
+						// either way we need to access the block, and in the end it must be valid
+						
+						// the update is done in background, but the element was accessed
+						// since it's a random element,we don't know it's set but we can calculate it:
+						unsigned long int set2too = v.value() % (unsigned long int)(pow(2, L2Size - L2Assoc - BSize));
+						L2.accessed(set2too, v.value());
+						L2.revalidate(set2too, v.value());
+
+						// ~~~
+
+						L1.add(set1, num);
+						// now we write into l1, and l2 is invalid
+						L2.invalidate(set2, num); // it techniclly arealy is invalid but i am PARANOID OK
+					}
+
+					if (DEBUG) // honeslty the whole this is great but my debugging functions fucking SLAYED i deserve extra point for it
+					{
+						// std::cout << "l1: " << L1miss << " L2: " << L2miss << std::endl;
+						cout << "L1: " << endl;
+						L1.stats();
+						cout << endl
+							 << endl
+							 << "L2: " << endl;
+						L2.stats();
+						cout << endl
+							 << "------------------------------------------------------" << endl;
+						cout << endl
+							 << endl;
+					}
+					continue;
+				}
+
 				// L2 miss as well
 				// failure is a habit by this point #ilovecs
 				L2miss++;
@@ -502,9 +585,12 @@ int main(int argc, char **argv)
 						// no space in L2
 						// kick a bitch out
 						unsigned long int v = L2.RemoveLRU(set2).value();
-						// L1.invalidate(v % (unsigned long int)(pow(2, L1Assoc)))
 						L1.removeSpecifically(v); // we don't know what set it is from so just remove him if he's there
 
+						L2.revalidate(v % (unsigned long int)(pow(2, L2Size - L2Assoc - BSize)), v);
+						// and of course, if we did that we must also update LRU
+						// wo know for a fact that L2 contain this bastard or else he wouldn't be in L1 to begin with
+						L2.accessed(v % (unsigned long int)(pow(2, L2Size - L2Assoc - BSize)), v);
 						// space was freed. add
 						L2.add(set2, num);
 					}
@@ -516,17 +602,22 @@ int main(int argc, char **argv)
 						// no space
 						// kick a bitch out
 						Cacheline v = L1.RemoveLRU(set1);
-						// L2 is allowed to have stuff L1 doesn't have, so we can leave it at that
+
+
+					/*  L2.revalidate(v % (unsigned long int)(pow(2, L2Size - L2Assoc - BSize)), v);
+						// and of course, if we did that we must also update LRU
+						// wo know for a fact that L2 contain this bastard or else he wouldn't be in L1 to begin with
+						L2.accessed(v % (unsigned long int)(pow(2, L2Size - L2Assoc - BSize)), v);*/
+
+
 
 						// if that element was modified, we'd have to update his data in L2, meaning it was accessed in L2
-						if (!v.validity())
-						{
-							// there was a modification.
-							// the update is done in background, but the elements was accessed
-							// since it's a random element,we don't know it's set but we can calculate it:
-							unsigned long int set2too = v.value() % (unsigned long int)(pow(2, L2Assoc));
-							L2.accessed(set2too, v.value());
-						}
+						// either way we need to access the block, and in the end it must be valid
+						// since it's a random element,we don't know it's set but we can calculate it:
+						unsigned long int set2too = v.value() % (unsigned long int)(pow(2, L2Size - L2Assoc - BSize));
+						L2.accessed(set2too, v.value());
+						L2.revalidate(set2too, v.value());
+
 						// space was freed. add
 						L1.add(set1, num);
 					}
@@ -535,7 +626,8 @@ int main(int argc, char **argv)
 				{
 					// finaly, write:
 					// writing only in L1
-					L1.invalidate(set1, num);
+					// now the data in l2 is wrong
+					L2.invalidate(set2, num);
 				}
 				// else
 				//  no writing back, the change is only in memory and the cache is as oblivious as a three year old :)
@@ -544,7 +636,6 @@ int main(int argc, char **argv)
 
 		if (DEBUG) // honeslty the whole this is great but my debugging functions fucking SLAYED i deserve extra point for it
 		{
-			// std::cout << "l1: " << L1miss << " L2: " << L2miss << std::endl;
 			cout << "L1: " << endl;
 			L1.stats();
 			cout << endl
