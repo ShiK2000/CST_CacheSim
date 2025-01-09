@@ -5,7 +5,7 @@
 #include <cmath> // literaly just for the pow and log function
 
 // fuck everything i am not recreating something that alredy exists
-const int DEBUG = 1;
+const int DEBUG = 0;
 #include <vector>
 #include <map>
 
@@ -446,8 +446,8 @@ int main(int argc, char **argv)
 		unsigned long int set2 = num % (unsigned long int)(pow(2, L2Size - L2Assoc - BSize));
 		if (DEBUG)
 			cout << "set1: " << set1 << " and set 2: " << set2 << endl;
-		// if the sets aren't defined int the cache yes we should add them
-		// 	this is done automatically in the practical situation but i am trying to save us some
+		// if the sets aren't defined in the cache yes we should add them
+		// 	this is done vacuasly in the practical situation but i am trying to save us some
 		// 	space by NOT having thousands of arrays hanging around.
 		L1.affirmSetIsIn(set1);
 		L2.affirmSetIsIn(set2);
@@ -529,6 +529,15 @@ int main(int argc, char **argv)
 					// L2.revalidate(set2, num);
 					L2.accessed(set2, num);
 
+
+					if(!WrAlloc)
+					{
+						// writing in no write allocate
+						// just updating the data in L2 and calling it a day
+						L2.revalidate(set2, num);
+						continue;
+					}
+					// otherwise, we need to bring the data to L1
 					// again, we know for a fact that the line is NOT in L1
 					if (!L1.add(set1, num))
 					{
@@ -650,8 +659,6 @@ int main(int argc, char **argv)
 	}
 	L1MissRate = (double)L1miss / L1acc;
 	L2MissRate = (double)L2miss / L2acc;
-	cout << "ok so L1miss is " << L1miss << " and L2 iss is " << L2miss << endl;
-	cout << "L1acc " << L1acc << " and 2 " << L2acc << endl;
 	double avgAccTime;
 	// we access l1 exactly once for each access we attempt
 	avgAccTime = accTimeCounter / L1acc;
